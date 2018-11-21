@@ -18,6 +18,8 @@ def handler(event, context):
   ACCESS_KEY_ID = os.environ['ACCESS_KEY_ID']
   ACCESS_KEY_SECRET = os.environ['ACCESS_KEY_SECRET']
 
+  ECS_EVENT = ["RunInstances", "CreateInstance"]
+
   #OSS関連初期設定
   Event = json.loads(event.decode('utf-8').replace("'", '"'))
   OssRegion = Event["events"][0]["region"]
@@ -51,8 +53,7 @@ def handler(event, context):
     logger.info("acsRegion : " + actionTrailLog["acsRegion"])
     logger.info("*"*20)
 
-
-    if actionTrailLog["eventName"] == "RunInstances" :
+    if actionTrailLog["eventName"] in ECS_EVENT:
 
       InstanceIdSet = actionTrailLog["responseElements"]["InstanceIdSets"]["InstanceIdSet"]
       Owner = actionTrailLog["userIdentity"]["userName"]
