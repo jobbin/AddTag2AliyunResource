@@ -1,8 +1,6 @@
 import os
 import oss2
 import zipfile
-import shutil
-import time
 import json
 import logging
 from aliyunsdkcore.client import AcsClient
@@ -18,8 +16,6 @@ def handler(event, context):
   ACCESS_KEY_ID = os.environ['ACCESS_KEY_ID']
   ACCESS_KEY_SECRET = os.environ['ACCESS_KEY_SECRET']
 
-  ECS_EVENT = ["RunInstances", "CreateInstance"]
-
   #OSS関連初期設定
   Event = json.loads(event.decode('utf-8').replace("'", '"'))
   OssRegion = Event["events"][0]["region"]
@@ -29,8 +25,9 @@ def handler(event, context):
 
   # ECS関連初期設定
   InstanceIdSet = []
-  Owner = ""
+  UserName = ""
   Region = ""
+  TagName = os.environ['TAG_NAME']
 
   # OSS
   auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
@@ -53,13 +50,18 @@ def handler(event, context):
     logger.info("acsRegion : " + actionTrailLog["acsRegion"])
     logger.info("*"*20)
 
-    if actionTrailLog["eventName"] in ECS_EVENT:
+    ECS = ["RunInstances", "CreateInstance"]
+    if actionTrailLog["eventName"] in ECS :
 
-      InstanceIdSet = actionTrailLog["responseElements"]["InstanceIdSets"]["InstanceIdSet"]
-      Owner = actionTrailLog["userIdentity"]["userName"]
+      if actionTrailLog["eventName"] == "RunInstances" :
+        InstanceIdSet = actionTrailLog["responseElements"]["InstanceIdSets"]["InstanceIdSet"]
+
+      if actionTrailLog["eventName"] == "CreateInstance" :
+        InstanceIdSet.append(actionTrailLog["responseElements"]["InstanceId"])
+
+      #logger.info(InstanceIdSet)
+      UserName = actionTrailLog["userIdentity"]["userName"]
       EcsRegion = actionTrailLog["acsRegion"]
-
-      logger.info(actionTrailLog["responseElements"]["InstanceIdSets"]["InstanceIdSet"])
 
     else:
       logger.info("Isn't RunInstances event !")
@@ -67,13 +69,14 @@ def handler(event, context):
   #ECS instanceにOwnerタグを追加
   client = AcsClient(ACCESS_KEY_ID, ACCESS_KEY_SECRET, EcsRegion)
 
+
   for instance in InstanceIdSet :
 
     request = AddTagsRequest.AddTagsRequest()
     request.set_ResourceType("instance")
     request.set_ResourceId(instance)
 
-    Tags = [{"Key": "Owner","Value": Owner}]
+    Tags = [{"Key": TagName,"Value": UserName}]
     request.set_Tags(Tags)
 
     client.do_action_with_exception(request)
